@@ -1,5 +1,5 @@
 '''
-    Script is used to determine the effectiveness of the various strategies used to estimate the box numbers
+    Used to determine the effectiveness of the various strategies used to estimate the box numbers
     for the correct answers provided by the students. 
     
     Student answers are compared to the true answers corresponding to each box using cosine similarity

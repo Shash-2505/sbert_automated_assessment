@@ -1,5 +1,5 @@
 '''
-    Script is used to predict the box numbers for the correct answers provided by the students using machine learning. 
+    Used to predict the box numbers for the correct answers provided by the students using machine learning. 
     
     Student answers are compared to the true answers corresponding to each box using cosine similarity
     of the sentence embeddings. A classifier is trained to estimate box numbers using question, student answer sentence embeddings,
@@ -12,10 +12,10 @@ import pandas as pd
 
 from sbert_automated_assessment.internal_libs.data_preprocess import preprocess_answer_data, exclude_box_true_answers, text_to_embeddings, semantic_sim_student_true_answer
 from sbert_automated_assessment.internal_libs.multiscorer import MultiScorer
+from sbert_automated_assessment.internal_libs.preprocess_train_svm import encode_and_bind, create_train_test_data, parameter_tune_svm_model
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.model_selection import cross_val_score, GridSearchCV,RepeatedStratifiedKFold, train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, cohen_kappa_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from sklearn.svm import SVC
 from statistics import mean
 
@@ -54,90 +54,6 @@ answers_coded = pd.read_excel(data_folder + "20230804_student_answers_all_datase
 true_answers = pd.read_csv(data_folder + "True_Answers.csv", sep=';')
 
 #------------------------------------Create functions--------------------------------------------
-def encode_and_bind(data:pd.DataFrame, y_var:str, features_to_encode:list) -> pd.DataFrame:
-    '''
-    One-hot encoding of categorical predictors and label encoding for outcome as [0,1,...n]
-
-    Parameters
-    ----------
-    data               : Dataset to encode with predictor and outcome variables
-    features_to_encode : Feature names to encode
-    y_var              : Outcome feature
-
-    Returns
-    -------
-    data_x_encoded     : Dataset with encoded features
-    data_y             : Outcome encoded  
-
-    '''
-    # Encode outcome
-    data_y = LabelEncoder().fit_transform(data[y_var])
-    
-    # One-hot encode x variables
-    data_x_encoded = data.drop(columns=[y_var])
-    
-    for feature in features_to_encode:
-        features_encoded = pd.get_dummies(data_x_encoded[feature], prefix = feature).reset_index().drop(columns = "index")
-        data_x_encoded = pd.concat([data_x_encoded, features_encoded], axis = "columns")
-        data_x_encoded = data_x_encoded.drop(columns = feature)
-    
-    return data_x_encoded, data_y
-
-def create_train_test_data(data_x:pd.DataFrame, data_y:list, answer_embeddings:np.array, train_features_exclude:list, test_size:float) -> pd.DataFrame:
-    '''
-    Training and test data generation
-
-    Parameters
-    ----------
-    data_x                 : All input features with categorical variables encoded
-    data_y                 : Outcome label encoded
-    answer_embeddings      : Array of text embeddings
-    train_features_exclude : Predictors to exclude
-    test_size              : Test data size as a proportion of dataset
-
-    Returns
-    -------
-    X_train, X_test        : Train and test set for predictors
-    y_train, y_test        : Train and test set for outcome
-
-    '''
-    # Exclude features not used for prediction
-    data_x = data_x.drop(columns=train_features_exclude)
-    # Add text embeddings
-    data_x = pd.concat([data_x, pd.DataFrame(answer_embeddings)], axis='columns')
-    data_x.columns = data_x.columns.astype(str)
-    # Create train test split
-    X_train, X_test, y_train, y_test = train_test_split(data_x, data_y, test_size=test_size, random_state=42)
-    
-    return X_train, X_test, y_train, y_test
-
-def parameter_tune_svm_model(X_train:list, y_train:list, param_grid:dict, n_splits:int, n_repeats:int, scoring:str='accuracy') -> GridSearchCV:
-    '''
-    Tune SVM model
-
-    Parameters
-    ----------
-    X_train    : Train set of predictors
-    y_train    : Train set of outcomes
-    param_grid : List of all SVM parameters for gridsearch
-    n_splits   : Number of stratified folds (K)
-    n_repeats  : Number of times K fold is repeated
-    scoring    : Metric to tune parameters for
-
-    Returns
-    -------
-    svm_gridsearch : Gridsearch outcome with best parameters and scores
-
-    '''
-    svm_model = SVC()
-    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=42)        
-    svm_gridsearch = GridSearchCV(svm_model, param_grid=param_grid, scoring=scoring, cv=cv, verbose=3)
-    svm_gridsearch.fit(X_train, y_train)
-    print("Best SVM params:", svm_gridsearch.best_params_)
-    print(f"Best {scoring}: {svm_gridsearch.best_score_}")
-    
-    return svm_gridsearch
-
 def svm_cross_val_score(svm_gridsearch:GridSearchCV, data_x:pd.DataFrame, data_y:list, average_method:str='macro') -> dict:
     '''
     Create 10 fold cross-validated accuracy, precision, recall, and f1 scores for a model on the full dataset
@@ -185,7 +101,7 @@ def svm_test_pred_score(y_test:list, y_pred:list, average_method:str='macro') ->
 
     Returns
     -------
-    performance_metrics : Dataframe with accuracy, precision, recall, and f1 scores
+    performance_metrics : Dataframe with accuracy, precision, recall, f1 and cohen kappa scores
 
     '''
     
@@ -195,10 +111,11 @@ def svm_test_pred_score(y_test:list, y_pred:list, average_method:str='macro') ->
     performance_metrics['precision'] = precision_score(y_test, y_pred, average=average_method, zero_division=np.nan)
     performance_metrics['recall'] = recall_score(y_test, y_pred, average=average_method, zero_division=np.nan)
     performance_metrics['f1'] = f1_score(y_test, y_pred, average=average_method, zero_division=np.nan)
+    performance_metrics['cohen_kappa'] = cohen_kappa_score(y_test, y_pred)
     
     # Convert to dataframe. Round and return
     performance_metrics = pd.DataFrame(performance_metrics.items(), columns=['metric', 'score'])
-    performance_metrics['score'] = performance_metrics['score'].round(2)
+    performance_metrics['score'] = performance_metrics['score'].round(4)
     print(performance_metrics)
     
     return performance_metrics
@@ -265,4 +182,5 @@ performance_metrics = svm_test_pred_score(y_test, y_pred)
 
 # Save output to excel
 with pd.ExcelWriter(output_folder + "SVM_Test_Prediction_Score_SB1.xlsx") as writer:
-    performance_metrics.to_excel(writer, sheet_name="Test_Pred_Scores", index=False) 
+    performance_metrics.to_excel(writer, sheet_name="Test_Pred_Scores", index=False)
+

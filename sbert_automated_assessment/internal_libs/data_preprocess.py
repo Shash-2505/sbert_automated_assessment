@@ -163,6 +163,7 @@ def semantic_sim_student_true_answer(answers_preprocessed:pd.DataFrame, answer_e
     true_answer_columns = true_answer_embeddings.columns.tolist()[1:]
     for i in range(np.shape(answer_embeddings)[0]):
         for j in range(len(similarity_column_name)):
-            answers_sim_scores[similarity_column_name[j]].iloc[i] = cos_sim(answer_embeddings[i].reshape(1,-1), 
-                                                                              true_answer_embeddings[true_answer_columns[j]][true_answer_embeddings['TextName'] == answers_sim_scores['Tekstnaam'].iloc[i]].to_numpy()[0].reshape(1,-1)).data.cpu().numpy()
+            answers_sim_scores[similarity_column_name[j]].iloc[i] = cos_sim(
+                answer_embeddings[i].reshape(1,-1), 
+                true_answer_embeddings[true_answer_columns[j]][true_answer_embeddings['TextName'] == answers_sim_scores['Tekstnaam'].iloc[i]].to_numpy()[0].reshape(1,-1)).data.cpu().numpy()
     return answers_sim_scores
