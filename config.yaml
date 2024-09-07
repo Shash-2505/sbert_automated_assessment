@@ -1,0 +1,15 @@
+# Dutch sentence transformer used for embedding
+# SB1 in the paper
+sentence_transformer_dutch: 'jegormeister/robbert-v2-dutch-base-mqa-finetuned'
+
+# Manually labelled dataset chosen for model training
+# Desar chosen as it has box numbers accurately coded
+dataset_name: ['Desar']
+
+# Box numbers chosen for box for model training
+# 1-4 are for correct answers and 0 is for incorrect answers which we don't want the model to learn
+box_numbers: [1,2,3,4]
+
+# True answer boxes to exclude from prediction
+# These boxes are already filled for the students
+exclude_boxes: {'Beton': 5, 'Botox': 1, 'Geld' : 5, 'Metro': 1, 'Muziek': 2, 'Suez': 5}
